@@ -3,8 +3,7 @@
 
 #define COMMAND_BUFFER_SIZE 64
 
-void shell_init(void);
-void shell_update(void);
+void shell(void);
 
 #endif
 
