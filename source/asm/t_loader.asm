@@ -1,10 +1,8 @@
 [bits 16]
 
 [global _start]
-[extern __t_init]
+[extern __t_main]
 
-MAX_SEGMENT_SIZE equ 0xffff
-; STACK_SEGMENT equ 0x17e0
 STACK_SEGMENT equ 0x2000
 
 _start:
@@ -16,7 +14,7 @@ _start:
 
     mov ax, STACK_SEGMENT
     mov ss, ax
-    mov sp, MAX_SEGMENT_SIZE
+    mov sp, 0xffff
     mov bp, sp
     nop
 
@@ -26,9 +24,8 @@ _start:
 
     sti
 
-    call __t_init
+t_entry:
+    call __t_main
     jmp $
-
-    ; times (SECTORS_PER_SEGMENT*BYTES_PER_SECTOR)-($-$$) db 0 ; Pad the rest of the temu sector.
 
 
