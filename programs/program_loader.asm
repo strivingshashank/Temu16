@@ -17,5 +17,6 @@ _start:
 
 call __program_init
 
-; Jump back to Temu
-jmp 0x07e0:0x00
+; Jump back to Temu segment
+jmp 0x1000:0x00
+

@@ -1,76 +1,61 @@
 /* Under-development */
 
-#include "t_screen.h"
-#include "t_kboard.h"
+#include "t_io.h"
 #include "t_utils.h"
 #include "t_types.h"
+#include "t_memory.h"
 
-bit8_t *string1;
-bit8_t num_1;
-bit8_t num_2;
-bit8_t sum;
-
+void greeting(void);
 void program_main(void);
-static void draw_top_bar(void);
 
 void _program_init(void) {
+  heap_init();
   program_main();
 }
 
 void program_main(void) {
-  screen_clear();
-  screen_set_display_page(0);
-  screen_set_line_index(0);
-  screen_set_column_index(0);
+  bit8_t temp_str[100];
+  bit16_t index = 0;
+  bit16_t *test_ptr;
   
-  draw_top_bar();
+  greeting();
 
-  screen_set_line_index(5);
-  screen_set_column_index(0);
+  test_ptr = (bit16_t *)(heap_alloc(100));
 
-  screen_write_char('y');
-  screen_write_char(0xdb);
-  screen_write_char(151);
-  screen_write_char(151);
-  screen_write_char(151);
+  index = 0;
+
+  while (index < 100) {
+    test_ptr[index] = index;
+    index++;
+  }
+
+  index = 0;
   
+  while (index < 100) {
+    write_dec(test_ptr[index]);
+    index++;
+  }
+
+  read_char();
+
   // while (1) {
-  //   screen_set_line_index(3);
-  //   screen_set_column_index(0);
-  //   num_1 = screen_read_dec();
-  //   screen_write_char('\n');
-  //   num_2 = screen_read_dec();
-  
-  //   screen_write_char('\n');
-    
-  //   screen_write_string("Sum: ");
-  //   screen_write_dec(num_1 + num_2);
-  //   kboard_get_key_blocking();
-  //   screen_clear();
+  //   write_string(" > ");
+  //   index = 0 = read_dec();
+  //   write_char('\n');
+  //   write_dec(index = 0);
+  //   write_char('\n');
+
+  //   // write_hex(get_key_blocking());
+  //   // read_char();
+  //   // if (get_key_blocking() == 0x1b) {
+  //   //   break;
+  //   // }
   // }
 
-
-  
-  // while (*string1) {
-  //   *string1 = kboard_get_char_blocking();
-  //   screen_write_char(*string1);
-  // }
-
-  
-  
-  while (1);
+  write_string("Exited : TCalc\n");
 }
 
-static void draw_top_bar(void) {
-  screen_set_line_index(0);
-  screen_set_column_index(0);
-  screen_write_string("+------------------------------------------------------------------------------+");
-  screen_write_char('|');
-
-  screen_set_column_index(37);
-  screen_write_string("TCalc");
-
-  screen_set_column_index(79);
-  screen_write_char('|');
-  screen_write_string("+------------------------------------------------------------------------------+");
+void greeting(void) {
+  write_string("----- TCalc -----\n");
+  write_string("Expression evaluating calculator.\n");
 }
