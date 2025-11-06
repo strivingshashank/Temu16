@@ -3,10 +3,14 @@
 
 [global __cursor_set] ; Needs work
 [global __set_display_page]
+[global __get_display_page]
+[global __screen_scroll]
+[global __screen_write_char]
 [global __mem_read8]
 [global __mem_read16]
 [global __mem_write8]
 [global __mem_write16]
+[global __mem_copy]
 [global __kboard_get_key_buffer]
 [global __kboard_get_key_blocking]
 [global __disk_read]
@@ -19,6 +23,7 @@
 [global idiv_u] ; for '/' (divison) operator
 [global imodu]  ; for '%' (modulus) operator
 
+; '/', division operator
 idiv_u:
     push dx
     xor dx, dx        ; quotient = 0
@@ -35,6 +40,7 @@ idiv_u:
     pop dx
     ret
 
+; '%', modulo operator
 imodu:
     push dx
     xor dx, dx
@@ -62,6 +68,21 @@ STACK_ELEMENT_SIZE equ 2
     int 0x10
 %endmacro
 
+%macro INTERRUPT_GET_DISPLAY_PAGE 0
+    mov ah, 0x03
+    int 0x10
+%endmacro
+
+%macro INTERRUPT_SCREEN_SCROLL_UPWARDS 0
+    mov ah, 0x06
+    int 0x10
+%endmacro
+
+%macro INTERRUPT_WRITE_CHAR 0
+    mov ah, 0x0e
+    int 0x10
+%endmacro
+
 %macro INTERRUPT_GET_KEY 0
     mov ah, 0x00
     int 0x16
@@ -82,20 +103,6 @@ STACK_ELEMENT_SIZE equ 2
     int 0x1a
 %endmacro
 
-%macro SET_EXTRA_SEGMENT 1
-    push ax
-
-    mov ax, %1
-    mov es, ax
-
-    pop ax
-%endmacro
-
-%macro RESET_EXTRA_SEGMENT 0
-    push cs
-    pop es
-%endmacro
-
 ; NOTE: This macro assumes that BP is set-up correctly.
 ; Usage: LOAD_CALLER_ARGUMENT n (1-based)
 %macro LOAD_CALLER_ARGUMENT 1
@@ -110,17 +117,27 @@ __cursor_set:
     push dx
 
     ; Resolve display page
-    mov bh, [bp + 4]
+    LOAD_CALLER_ARGUMENT 1
+    mov bh, al
     ; Resolve row index
-    mov dh, [bp + 6]
+    LOAD_CALLER_ARGUMENT 2
+    mov dh, al
     ; Resolve column index
-    mov dl, [bp + 8]
+    LOAD_CALLER_ARGUMENT 3
+    mov dl, al
 
     INTERRUPT_SET_CURSOR
 
     pop dx
     pop bx
     pop bp
+    ret
+
+__get_display_page:
+    INTERRUPT_GET_DISPLAY_PAGE
+    mov al, bh
+    mov ah, 0
+
     ret
 
 __set_display_page:
@@ -133,12 +150,40 @@ __set_display_page:
     pop bp
     ret
 
-__mem_write8:
-    push  bp
+__screen_scroll:
+    push cx
+    push dx
+
+    mov al, 1 ; Lines to scroll
+    mov ch, 0 ; top left line
+    mov cl, 0 ; top left column
+    mov dh, 24 ; bottom right line
+    mov dl, 79 ; bottom right column
+
+    INTERRUPT_SCREEN_SCROLL_UPWARDS
+
+    pop dx
+    pop cx
+    ret
+
+__screen_write_char:
+    push bp
     mov bp, sp
 
     LOAD_CALLER_ARGUMENT 1
-    SET_EXTRA_SEGMENT ax
+    INTERRUPT_WRITE_CHAR
+
+    pop bp
+    ret
+
+__mem_write8:
+    push  bp
+    mov bp, sp
+    
+    push es
+
+    LOAD_CALLER_ARGUMENT 1
+    mov es, ax
     
     LOAD_CALLER_ARGUMENT 2
     mov di, ax
@@ -146,7 +191,7 @@ __mem_write8:
     LOAD_CALLER_ARGUMENT 3
     mov [es:di], al
 
-    RESET_EXTRA_SEGMENT
+    pop es
     pop bp    
     ret
 
@@ -154,8 +199,10 @@ __mem_write16:
     push  bp
     mov bp, sp
 
+    push es
+
     LOAD_CALLER_ARGUMENT 1
-    SET_EXTRA_SEGMENT ax
+    mov es, ax
     
     LOAD_CALLER_ARGUMENT 2
     mov di, ax
@@ -163,7 +210,7 @@ __mem_write16:
     LOAD_CALLER_ARGUMENT 3
     mov [es:di], ax
 
-    RESET_EXTRA_SEGMENT
+    pop es
     pop bp    
     ret
 
@@ -171,15 +218,17 @@ __mem_read8:
     push bp
     mov bp, sp
 
+    push es
+
     LOAD_CALLER_ARGUMENT 1
-    SET_EXTRA_SEGMENT ax
+    mov es, ax
 
     LOAD_CALLER_ARGUMENT 2
     mov di, ax
     
     mov ax, [es:di]
 
-    RESET_EXTRA_SEGMENT
+    pop es
     pop bp
     ret
 
@@ -187,15 +236,53 @@ __mem_read16:
     push bp
     mov bp, sp
 
+    push es
+
     LOAD_CALLER_ARGUMENT 1
-    SET_EXTRA_SEGMENT ax
+    mov es, ax    
 
     LOAD_CALLER_ARGUMENT 2
     mov di, ax
     
     mov ax, [es:di]
 
-    RESET_EXTRA_SEGMENT
+    pop es
+    pop bp
+    ret
+
+__mem_copy:
+    push bp
+    mov bp, sp
+
+    push ds
+    push es
+    push si
+    push di
+    push cx
+
+    LOAD_CALLER_ARGUMENT 1
+    mov ds, ax
+
+    LOAD_CALLER_ARGUMENT 2
+    mov si, ax
+
+    LOAD_CALLER_ARGUMENT 3
+    mov es, ax
+
+    LOAD_CALLER_ARGUMENT 4
+    mov di, ax
+
+    LOAD_CALLER_ARGUMENT 5
+    mov cx, ax
+
+    cld ; Clear direction flag so that me increment after each iteration
+    rep movsb ; Actual copying of data
+
+    pop cx
+    pop di
+    pop si
+    pop es
+    pop ds
     pop bp
     ret
 
@@ -301,9 +388,6 @@ __jump_far:
     push bp
     mov bp, sp
 
-    push cs
-    push .return
-
     ; New code segment
     LOAD_CALLER_ARGUMENT 1
     push ax
@@ -319,3 +403,4 @@ __jump_far:
     ret
 
 %endif
+
