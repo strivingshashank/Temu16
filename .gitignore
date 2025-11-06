@@ -1,7 +1,12 @@
 .vscode/
 bin/
 build/
+tmp/
 
 *.img
 *.o
 *.bin
+
+build_temu.sh
+build_program.sh
+
