@@ -1,107 +1,87 @@
 #include "t_memory.h"
 #include "asm_bindings.h"
+#include "t_types.h"
 
-bit8_t heap_map[HEAP_BLOCK_COUNT];
-bit16_t heap_index;
+#define HEAP_SIZE 16384 /* 16 kib */
+#define HEAP_MAP_SIZE (HEAP_SIZE / 8)
+
+void heap_init(void);
+void *heap_alloc(bit16_t requested_bytes);
+void heap_free(void *heap_ptr, bit16_t allocated_bytes);
+
+/* Heap bitmap */
+bit8_t heap_map[HEAP_MAP_SIZE];
+/* Heap array */
+bit8_t heap[HEAP_SIZE];
 
 void heap_init(void) {
-  // Setup heap-map
-  for (heap_index = 0; heap_index < HEAP_BLOCK_COUNT; heap_index++) {
-    heap_map[heap_index] = 0;
+  static bool_t heap_initialized = FALSE;
+  bit16_t heap_map_index = 0;
+  
+  if (heap_initialized == TRUE) {
+    return;
   }
-
-  heap_index = 0;
+  
+  for (heap_map_index = 0; heap_map_index < HEAP_MAP_SIZE; heap_map_index++) {
+    heap_map[heap_map_index] = 0;
+  }
+  
+  heap_initialized = TRUE;
 }
 
-hptr_t heap_alloc(void) {
-  for (heap_index = 1; heap_index < HEAP_BLOCK_COUNT; heap_index++) {
-    if (heap_map[heap_index] == 0) {
-      heap_map[heap_index] = 1;
-      return heap_index * HEAP_BLOCK_SIZE;
+void *heap_alloc(bit16_t requested_bytes) {
+  /* bits_per_byte = 8 */
+  bit16_t free_bytes_count = 0;
+  bit16_t free_bytes_start_index = 0;
+  bit16_t byte_index = 0;
+  
+  for (byte_index = 0; byte_index < HEAP_MAP_SIZE; byte_index++) {
+    bit16_t bit_index = 0;
+
+    for (bit_index = 0; bit_index < 8; bit_index++) {
+      bit8_t bit_value = heap_map[byte_index] >> bit_index;
+
+      /* Is bytes free? */
+      if ((bit_value & 1) == 0) {
+        if (free_bytes_count == 0) {
+          free_bytes_start_index = (byte_index * 8) + bit_index;
+        }
+        
+        free_bytes_count++;
+        
+        /* Are requested bytes available? */
+        if (requested_bytes <= free_bytes_count) {
+          bit16_t count = 0;
+          
+          /* Reserve the bits in map */
+          for (count = 0; count < requested_bytes; count++) {
+            byte_index = (free_bytes_start_index + count) / 8;
+            bit_index = (free_bytes_start_index + count) % 8;
+            
+            heap_map[byte_index] |= (1 << bit_index);
+          }
+
+          /* Return physical address */
+          return (void *)(heap + free_bytes_start_index);
+        }
+      } else {
+        free_bytes_count = 0;
+      }
     }
   }
 
-  // No memory available.
-  return NULL;
+  return NULL_PTR;
 }
 
-void heap_free(hptr_t free_hptr) {
-  free_hptr %= HEAP_BLOCK_SIZE;
-  heap_map[free_hptr] = 0;
+void heap_free(void *heap_ptr, bit16_t allocated_bytes) {
+  bit16_t bytes_start_index = ((bit8_t *)(heap_ptr)) - heap;
+  bit16_t count = 0;
+
+  for (count = 0; count < allocated_bytes; count++) {
+    bit16_t byte_index = (bytes_start_index + count) / 8;
+    bit8_t bit_index = (bytes_start_index + count) % 8;
+
+    heap_map[byte_index] &= ~(1 << bit_index);
+  }
 }
-
-bit8_t heap_read8(hptr_t read_hptr, bit16_t index) {
-  return _mem_read8(HEAP_SEGMENT, read_hptr + index);
-}
-
-bit16_t heap_read16(hptr_t read_hptr, bit16_t index) {
-  return _mem_read16(HEAP_SEGMENT, read_hptr + index);
-}
-
-void heap_write8(hptr_t write_hptr, bit16_t index, bit8_t value) {
-  _mem_write8(HEAP_SEGMENT, write_hptr + index, value);
-}
-
-void heap_write16(hptr_t write_hptr, bit16_t index, bit16_t value) {
-  _mem_write16(HEAP_SEGMENT, write_hptr + index, value);
-}
-
-// void heap_dump(void) {
-//   bit16_t used_block_count = 0;
-//   bit16_t index = 0;
-
-//   konsole_write_string("Heap map:\n");
-//   konsole_write_string("Block\tStatus\n");
-  
-//   for (index = 0; index < HEAP_BLOCK_COUNT; index++) {
-//     bit8_t blockStatus = heap_map[index];
-//     (blockStatus) ? used_block_count++ : used_block_count;
-//     konsole_write_char(index);
-//     konsole_write_string("\t\t\t");
-//     konsole_write_char(blockStatus);
-//     konsole_write_char('\n');
-//   }
-
-//   konsole_write_string("Heap blocks used: ");
-//   konsole_write_dec(used_block_count);
-//   konsole_write_char('\n');
-//   konsole_write_string("Heap blocks free: ");
-//   konsole_write_dec(HEAP_BLOCK_COUNT - used_block_count);
-//   konsole_write_char('\n');
-// }
-
-// void heap_dump(void) {
-//   bit16_t used_count = 0;
-//   bit16_t index;
-  
-//   konsole_write_string("Heap map:\n");
-
-//   for (index = 0; index < HEAP_BLOCK_COUNT; index++) {
-//     bit8_t state = heap_map[index];
-//     konsole_write_char(state ? '1' : '0');
-//     konsole_write_char(' ');
-
-//     if (state) used_count++;
-
-//     // new line every 32 blocks
-//     if ((index + 1) % 32 == 0) {
-//       konsole_write_char('\n');
-
-//       konsole_getKey_blocking();
-//     }
-//   }
-
-//   konsole_write_string("\nStats:\n");
-//   konsole_write_string("Total blocks: ");
-//   konsole_write_dec(HEAP_BLOCK_COUNT);
-//   konsole_write_char('\n');
-
-//   konsole_write_string("Used blocks : ");
-//   konsole_write_dec(used_count);
-//   konsole_write_char('\n');
-
-//   konsole_write_string("Free blocks : ");
-//   konsole_write_dec(HEAP_BLOCK_COUNT - used_count);
-//   konsole_write_char('\n');
-// }
 
