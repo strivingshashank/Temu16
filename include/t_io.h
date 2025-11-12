@@ -21,19 +21,31 @@
 #define COLOR_LIGHT_BROWN 0xe
 #define COLOR_WHITE 0xf
 
+
+// Character codes (ASCII)
+#define CHARACTER_WHITESPACE 0x20
+#define CHARACTER_BACKSPACE 0x08
+#define CHARACTER_LINE_FEED 0x0a
+#define CHARACTER_CARRIAGE_RETURN 0x0d
+#define CHARACTER_HORIZONTAL_TAB 0x09
+#define CHARACTER_ESCAPE 0x1b
+
 bit16_t get_key(void);
 bit16_t get_key_blocking(void);
 
 bit8_t read_char(void); /* This is a blocking function */
 bit16_t read_dec(void);
-void read_string(bit8_t *buffer, bit16_t max_length);
+void read_str(bit8_t *buffer, size_t max_length);
 
 void write_char(bit8_t character);
 void write_dec(bit16_t dec_value);
+void write_sdec(sbit16_t dec_value);
 void write_hex(bit16_t hex_value);
-void write_string(bit8_t *string);
+void write_str(bit8_t *str);
 
 void clear_screen(void);
+
+void wait_for_char(bit8_t character);
 
 #endif
 
