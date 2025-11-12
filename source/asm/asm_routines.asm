@@ -6,6 +6,7 @@
 [global __get_display_page]
 [global __screen_scroll]
 [global __screen_write_char]
+[global __mem_get_size]
 [global __mem_read8]
 [global __mem_read16]
 [global __mem_write8]
@@ -17,13 +18,30 @@
 [global __time_get_hours]
 [global __time_get_minutes]
 [global __time_get_seconds]
+[global __time_get_century]
+[global __time_get_year]
+[global __time_get_month]
+[global __time_get_date]
+[global __jump_far]
+[global __sys_shutdown]
+
+; Required by Bruce's C Compiler
+[global idiv_u] ; for '/' (divison) operator
+[global imodu]  ; for '%' (modulus) operator
+[global imod]  
+
+
+[global __time_get_century]
+[global __time_get_month]
+[global __time_get_date]
 [global __jump_far]
 
 ; Required by Bruce's C Compiler
 [global idiv_u] ; for '/' (divison) operator
 [global imodu]  ; for '%' (modulus) operator
+[global imod]  
 
-; '/', division operator
+; '/', division operatorsdasdasd; '/', division operator
 idiv_u:
     push dx
     xor dx, dx        ; quotient = 0
@@ -52,6 +70,36 @@ imodu:
     jmp .modLoop
 
 .return:
+    pop dx
+    ret
+
+imod:
+    push dx
+
+    ; Handle sign of numerator
+    mov dx, ax          ; copy numerator
+    sar dx, 15          ; dx = 0xFFFF if ax<0, else 0x0000
+    xor ax, dx
+    sub ax, dx          ; ax = |numerator|
+
+    ; Handle sign of denominator (only magnitude matters for mod)
+    mov cx, bx
+    sar cx, 15
+    xor bx, cx
+    sub bx, cx          ; bx = |denominator|
+
+.modLoop:
+    cmp ax, bx
+    jb .restoreSign
+    sub ax, bx
+    jmp .modLoop
+
+.restoreSign:
+    ; If original numerator was negative, restore sign
+    mov dx, dx          ; dx still holds sign mask from numerator
+    xor ax, dx
+    sub ax, dx
+
     pop dx
     ret
 
@@ -101,6 +149,15 @@ STACK_ELEMENT_SIZE equ 2
 %macro INTERRUPT_GET_TIME 0
     mov ah, 0x02
     int 0x1a
+%endmacro
+
+%macro INTERRUPT_GET_DATE 0
+    mov ah, 0x04
+    int 0x1a
+%endmacro
+
+%macro INTERRUPT_GET_MEM_SIZE 0
+    int 0x12
 %endmacro
 
 ; NOTE: This macro assumes that BP is set-up correctly.
@@ -174,6 +231,10 @@ __screen_write_char:
     INTERRUPT_WRITE_CHAR
 
     pop bp
+    ret
+
+__mem_get_size:
+    INTERRUPT_GET_MEM_SIZE
     ret
 
 __mem_write8:
@@ -358,8 +419,8 @@ __time_get_hours:
     INTERRUPT_GET_TIME
     mov al, ch
 
-    pop cx
     pop dx
+    pop cx
     ret
 
 __time_get_minutes:
@@ -369,8 +430,8 @@ __time_get_minutes:
     INTERRUPT_GET_TIME
     mov al, cl
 
-    pop cx
     pop dx
+    pop cx
     ret
 
 __time_get_seconds:
@@ -380,8 +441,52 @@ __time_get_seconds:
     INTERRUPT_GET_TIME
     mov al, dh
 
-    pop cx
     pop dx
+    pop cx
+    ret
+
+__time_get_century:
+    push cx
+    push dx
+
+    INTERRUPT_GET_DATE
+    mov al, ch
+
+    pop dx
+    pop cx
+    ret
+
+__time_get_year:
+    push cx
+    push dx
+
+    INTERRUPT_GET_DATE
+    mov al, cl
+
+    pop dx
+    pop cx
+    ret
+    
+__time_get_month:
+    push cx
+    push dx
+
+    INTERRUPT_GET_DATE
+    mov al, dh
+
+    pop dx
+    pop cx
+    ret
+
+__time_get_date:
+    push cx
+    push dx
+
+    INTERRUPT_GET_DATE
+    mov al, dl
+
+    pop dx
+    pop cx
     ret
 
 __jump_far:
@@ -400,6 +505,17 @@ __jump_far:
 
 .return:
     pop bp
+    ret
+
+__sys_shutdown:
+    mov ax, 0x5301    ; APM Connect
+    xor bx, bx
+    int 0x15
+
+    mov ax, 0x5307    ; APM Set Power State
+    mov bx, 1
+    mov cx, 3         ; Power Off
+    int 0x15
     ret
 
 %endif

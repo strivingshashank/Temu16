@@ -14,6 +14,7 @@ extern void _screen_clear(void);
 extern void _screen_write_char(bit8_t character);
 
 /* memory */
+extern bit16_t _mem_get_size(void);
 extern void _mem_write8(bit16_t segment, bit16_t offset, bit8_t value);
 extern void _mem_write16(bit16_t segment, bit16_t offset, bit16_t value);
 extern bit8_t _mem_read8(bit16_t segment, bit16_t offset);
@@ -31,9 +32,15 @@ extern bit8_t _disk_read(bit8_t cylinder_index, bit8_t head_index, bit8_t sector
 extern bit8_t _time_get_hours(void);
 extern bit8_t _time_get_minutes(void);
 extern bit8_t _time_get_seconds(void);
+extern bit8_t _time_get_century(void);
+extern bit8_t _time_get_year(void);
+extern bit8_t _time_get_month(void);
+extern bit8_t _time_get_date(void);
 
 /* jump far to a segment:offset */
 extern void _jump_far(bit16_t code_segment, bit16_t instruction_pointer);
+
+extern void _sys_shutdown(void);
 
 #endif
 
